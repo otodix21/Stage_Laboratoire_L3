@@ -14,16 +14,10 @@ from openwind import ImpedanceComputation
 #%% Code
 
 def norm_l2(Z1, Z2):
-    norm_Z1 = np.sum(Z1**2)
-    err = np.sum((Z1-Z2)**2)/norm_Z1
-    return err
-
-# geometry = [[0, .2, 5e-3, 7e-3, 'linear'],
-#             [.2, .3, 9e-3, 9e-3, 'linear'],
-#             [.3,.45,9e-3,90e-3, 'bessel', .75]]
+    return np.linalg.norm(Z1 - Z2) / np.linalg.norm(Z1)
 
 
-#Tuyau conique (géométrie et fréquences)
+#Géométrie et fréquences
 geometry = [[0, 0.2, 5e-3, 5e-3, 'linear' ]]
 freq = np.arange(200,2001,1)
 
@@ -34,48 +28,55 @@ result = ImpedanceComputation(freq, geometry, l_ele=.05, order=6, interp=True)
 result.plot_instrument_geometry()
 result.plot_impedance()
 result.plot_ac_field(var='pressure')
-
-Z = result.impedance
 result.discretization_infos()
 
-# l_ele_dict = {'bore0':0.1, 'bore1':0.1, 'bore2':0.02}
-# # order_dict = {'bore0':4, 'bore1':8, 'bore2':6}
-
-# l_ele_dict = {'bore0':0.1, 'bore1':0.1, 'bore2':[.05,.05,.02,.02,.01]}
-# order_dict = {'bore0':4, 'bore1':8, 'bore2':[4,4,6,6,8]}
+Z = result.impedance
 
 
-#Etude de convergence
-print("\n--- Calcul de l'étude de convergence ---")
-ref_result = ImpedanceComputation(freq, geometry, l_ele=0.002, order=8, interp=True)
-Z_ref = ref_result.impedance
+#%% Erreur en fonction de l'ordre
 
+print("\nCalcul de l'étude de convergence")
 
-#Différentes tailles de mailles
-liste_l_ele = [0.05, 0.02, 0.01, 0.005]
-erreurs_ordre_2 = []
-erreurs_ordre_4 = []
+ref_ordre = ImpedanceComputation(freq, geometry, l_ele=0.005, order=8, interp=True)
+Z_ref_ordre = ref_ordre.impedance
 
+ordres = [1, 2, 3, 4, 5, 6]  # On restreint aux ordres principaux
+erreurs_ordres = []
 
-for l in liste_l_ele:
-    #Test avec l'ordre 2
-    res2 = ImpedanceComputation(freq, geometry, l_ele=l, order=2, interp=True)
-    erreurs_ordre_2.append(norm_l2(Z_ref, res2.impedance))
+for ord_val in ordres:
+    res = ImpedanceComputation(freq, geometry, l_ele=0.02, order=ord_val, interp=True)
+    erreurs_ordres.append(norm_l2(Z_ref_ordre, res.impedance))
     
-    #Test avec l'odre 4
-    res4 = ImpedanceComputation(freq, geometry, l_ele=l, order=4, interp=True)
-    erreurs_ordre_4.append(norm_l2(Z_ref, res4.impedance))
-    
-
-#Figure de convergence
 plt.figure()
-plt.loglog(liste_l_ele, erreurs_ordre_2, 'o-', label='Ordre 2')
-plt.loglog(liste_l_ele, erreurs_ordre_4, 's-', label='Ordre 4')
-plt.xlabel("Taille de la maille (l_ele)")
-plt.ylabel("Erreur L2 par rapport à la référence")
-plt.title("Courbe de convergence")
+plt.semilogy(ordres, erreurs_ordres, 'o-', color='black')
+plt.xlabel("Finite elements order")
+plt.ylabel(r"$\frac{\|Z_{FEM} - Z_{TMM}\|}{\|Z_{TMM}\|}$")
+plt.title("Convergence en fonction de l'ordre")
+plt.grid(True, which="both", ls="--")
+
+#%% Erreur en fonction de la taille de maille
+
+print("\nCalcul de la convergence en fonction de la taille de maille...")
+
+ref_maille = ImpedanceComputation(freq, geometry, l_ele=0.002, order=6, interp=True)
+Z_ref_maille = ref_maille.impedance
+
+# On réduit à 4 tailles de mailles clés pour que ça aille très vite
+liste_l_ele = [0.05, 0.02, 0.01, 0.005]
+ordres_a_tester = [2, 4]  # On teste l'ordre 2 et l'ordre 4
+
+plt.figure()
+for ord_val in ordres_a_tester:
+    errs = []
+    for l in liste_l_ele:
+        res = ImpedanceComputation(freq, geometry, l_ele=l, order=ord_val, interp=True)
+        errs.append(norm_l2(Z_ref_maille, res.impedance))
+    plt.loglog(liste_l_ele, errs, 'o-', label=f'order {ord_val}')
+    
+
+plt.xlabel("Target Element Size (TES)")
+plt.ylabel(r"$\frac{\|Z_{FEM} - Z_{TMM}\|}{\|Z_{TMM}\|}$")
+plt.title("Convergence en fonction de la taille de maille")
 plt.grid(True, which="both", ls="--")
 plt.legend()
 plt.show()
-
-
