@@ -37,46 +37,66 @@ Z = result.impedance
 
 print("\nCalcul de l'étude de convergence")
 
-ref_ordre = ImpedanceComputation(freq, geometry, l_ele=0.005, order=8, interp=True)
-Z_ref_ordre = ref_ordre.impedance
 
 ordres = [1, 2, 3, 4, 5, 6]  # On restreint aux ordres principaux
-erreurs_ordres = []
+mailles_a_tester = [0.05, 0.02, 0.01]
 
-for ord_val in ordres:
-    res = ImpedanceComputation(freq, geometry, l_ele=0.02, order=ord_val, interp=True)
-    erreurs_ordres.append(norm_l2(Z_ref_ordre, res.impedance))
-    
 plt.figure()
-plt.semilogy(ordres, erreurs_ordres, 'o-', color='black')
-plt.xlabel("Finite elements order")
-plt.ylabel(r"$\frac{\|Z_{FEM} - Z_{TMM}\|}{\|Z_{TMM}\|}$")
+
+for l_fixe in mailles_a_tester:
+    erreurs_ordres = []
+    
+    for ord_val in ordres:
+        res = ImpedanceComputation(freq, geometry, l_ele=l_fixe, order=ord_val, interp=True)
+        res_suivant = ImpedanceComputation(freq, geometry, l_ele=l_fixe, order=ord_val + 1, interp=True)
+        erreurs_ordres.append(norm_l2(res_suivant.impedance, res.impedance))
+    plt.semilogy(ordres, erreurs_ordres, 'o-', label=f'l_ele = {l_fixe} m')
+
+
+# Affichage de l'erreur limite machine (10^-16)
+plt.axhline(1e-16, color='red', linestyle='--', label='Erreur limite ($10^{-16}$)')
+plt.ylim(bottom=1e-17)
+
+    
+plt.xlabel("Finite elements order (p)")
+plt.ylabel(r"$\frac{\|Z_{p+1} - Z_{p}\|}{\|Z_{p+1}\|}$")
 plt.title("Convergence en fonction de l'ordre")
 plt.grid(True, which="both", ls="--")
+plt.legend()
+
 
 #%% Erreur en fonction de la taille de maille
 
 print("\nCalcul de la convergence en fonction de la taille de maille...")
 
-ref_maille = ImpedanceComputation(freq, geometry, l_ele=0.002, order=6, interp=True)
-Z_ref_maille = ref_maille.impedance
 
 # On réduit à 4 tailles de mailles clés pour que ça aille très vite
 liste_l_ele = [0.05, 0.02, 0.01, 0.005]
 ordres_a_tester = [2, 4]  # On teste l'ordre 2 et l'ordre 4
 
 plt.figure()
+
 for ord_val in ordres_a_tester:
+    ref_maille = ImpedanceComputation(freq, geometry, l_ele=0.002, order=ord_val, interp=True)
+    Z_ref_maille = ref_maille.impedance
+    
     errs = []
+    
     for l in liste_l_ele:
         res = ImpedanceComputation(freq, geometry, l_ele=l, order=ord_val, interp=True)
         errs.append(norm_l2(Z_ref_maille, res.impedance))
     plt.loglog(liste_l_ele, errs, 'o-', label=f'order {ord_val}')
     
 
+# Affichage de l'erreur limite machine (10^-16)
+plt.axhline(1e-16, color='red', linestyle='--', label='Erreur limite ($10^{-16}$)')
+plt.ylim(bottom=1e-17)
+
+
 plt.xlabel("Target Element Size (TES)")
-plt.ylabel(r"$\frac{\|Z_{FEM} - Z_{TMM}\|}{\|Z_{TMM}\|}$")
+plt.ylabel(r"$\frac{\|Z_{FEM} - Z_{ref}\|}{\|Z_{ref}\|}$")
 plt.title("Convergence en fonction de la taille de maille")
 plt.grid(True, which="both", ls="--")
 plt.legend()
 plt.show()
+
